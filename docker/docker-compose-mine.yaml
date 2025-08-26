@@ -6,8 +6,6 @@ services:
         condition: service_healthy
       redis-cache:
         condition: service_healthy
-      qdrant:
-        condition: service_healthy
     environment:
       # Core FlowiseAI Configuration
       - 'PORT=${PORT:-3001}'
@@ -140,12 +138,4 @@ services:
       - "6334"
     volumes:
       - 'flowise-qdrant-data:/qdrant/storage'
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - "wget -qO- http://127.0.0.1:6333/health || exit 1"
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
     restart: always
