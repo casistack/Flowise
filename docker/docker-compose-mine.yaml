@@ -14,10 +14,6 @@ services:
       - 'DEBUG=${DEBUG:-false}'
       - 'DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}'
       
-      # Authentication (set your own values)
-      - 'FLOWISE_USERNAME=${FLOWISE_USERNAME:-admin}'
-      - 'FLOWISE_PASSWORD=${FLOWISE_PASSWORD:-password123}'
-
       # Database Configuration
       - DATABASE_PATH=/root/.flowise
       - 'DATABASE_TYPE=${DATABASE_TYPE:-postgres}'
