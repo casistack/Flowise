@@ -1,0 +1,155 @@
+services:
+  flowise:
+    image: 'flowiseai/flowise:latest'
+    depends_on:
+      pg-record-manager:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      # Core FlowiseAI Configuration
+      - 'PORT=${PORT:-3001}'
+      - 'DEBUG=${DEBUG:-false}'
+      - 'DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY:-true}'
+      
+      # Authentication (set your own values)
+      - 'FLOWISE_USERNAME=${FLOWISE_USERNAME:-admin}'
+      - 'FLOWISE_PASSWORD=${FLOWISE_PASSWORD:-password123}'
+
+      # Database Configuration
+      - DATABASE_PATH=/root/.flowise
+      - 'DATABASE_TYPE=${DATABASE_TYPE:-postgres}'
+      - 'DATABASE_PORT=${DATABASE_PORT:-5432}'
+      - 'DATABASE_HOST=${DATABASE_HOST:-pg-record-manager}'
+      - 'DATABASE_NAME=${DATABASE_NAME:-flowise}'
+      - 'DATABASE_USER=${DATABASE_USER:-flowiseuser}'
+      - 'DATABASE_PASSWORD=${DATABASE_PASSWORD:-flowisepass}'
+      - 'DATABASE_SSL=${DATABASE_SSL:-false}'
+
+      # Secret Keys Configuration
+      - 'SECRETKEY_STORAGE_TYPE=${SECRETKEY_STORAGE_TYPE:-local}'
+      - SECRETKEY_PATH=/root/.flowise
+      - 'FLOWISE_SECRETKEY_OVERWRITE=${FLOWISE_SECRETKEY_OVERWRITE:-mySecretKey123}'
+
+      # Logging Configuration
+      - LOG_PATH=/root/.flowise/logs
+      - 'LOG_LEVEL=${LOG_LEVEL:-info}'
+      - 'TOOL_FUNCTION_BUILTIN_DEP=${TOOL_FUNCTION_BUILTIN_DEP:-crypto,fs}'
+      - 'TOOL_FUNCTION_EXTERNAL_DEP=${TOOL_FUNCTION_EXTERNAL_DEP:-}'
+
+      # Storage Configuration
+      - 'STORAGE_TYPE=${STORAGE_TYPE:-local}'
+      - BLOB_STORAGE_PATH=/root/.flowise/storage
+
+      # Settings Configuration
+      - 'NUMBER_OF_PROXIES=${NUMBER_OF_PROXIES:-1}'
+      - 'CORS_ORIGINS=${CORS_ORIGINS:-*}'
+      - 'IFRAME_ORIGINS=${IFRAME_ORIGINS:-*}'
+      - 'FLOWISE_FILE_SIZE_LIMIT=${FLOWISE_FILE_SIZE_LIMIT:-50mb}'
+      - 'SHOW_COMMUNITY_NODES=${SHOW_COMMUNITY_NODES:-true}'
+
+      # Redis Configuration
+      - 'REDIS_HOST=${REDIS_HOST:-redis-cache}'
+      - 'REDIS_PORT=${REDIS_PORT:-6379}'
+      - 'REDIS_USERNAME=${REDIS_USERNAME:-}'
+      - 'REDIS_PASSWORD=${REDIS_PASSWORD:-}'
+
+      # Queue Configuration
+      - 'QUEUE_NAME=${QUEUE_NAME:-flowise-queue}'
+      - 'WORKER_CONCURRENCY=${WORKER_CONCURRENCY:-10000}'
+      - 'REMOVE_ON_AGE=${REMOVE_ON_AGE:-86400}'
+      - 'REMOVE_ON_COUNT=${REMOVE_ON_COUNT:-1000}'
+
+      # JWT Configuration
+      - 'JWT_AUTH_TOKEN_SECRET=${JWT_AUTH_TOKEN_SECRET:-myJWTSecret123456789}'
+      - 'JWT_REFRESH_TOKEN_SECRET=${JWT_REFRESH_TOKEN_SECRET:-myRefreshSecret123456789}'
+      - 'EXPRESS_SESSION_SECRET=${EXPRESS_SESSION_SECRET:-mySessionSecret}'
+
+      # Legacy paths
+      - APIKEY_PATH=/root/.flowise
+    ports:
+      - ":3001"
+    expose:
+      - "3001"
+    volumes:
+      - 'flowise-data:/root/.flowise'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'wget -qO- http://127.0.0.1:3001/api/v1/ping || exit 1'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+
+  pg-record-manager:
+    image: 'postgres:16'
+    environment:
+      - 'POSTGRES_USER=${POSTGRES_USER:-flowiseuser}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-flowisepass}'
+      - 'POSTGRES_DB=${POSTGRES_DB:-flowise}'
+      - 'POSTGRES_INITDB_ARGS=${POSTGRES_INITDB_ARGS:---encoding=UTF8 --lc-collate=C --lc-ctype=C}'
+      - 'POSTGRES_HOST_AUTH_METHOD=${POSTGRES_HOST_AUTH_METHOD:-md5}'
+    ports:
+      - ":5432"
+    expose:
+      - "5432"
+    volumes:
+      - 'pg-record-manager-data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -h localhost -U ${POSTGRES_USER:-flowiseuser} -d ${POSTGRES_DB:-flowise}'
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    restart: always
+
+  redis-cache:
+    image: 'redis:7'
+    environment:
+      - 'REDIS_MAXMEMORY=${REDIS_MAXMEMORY:-256mb}'
+      - 'REDIS_MAXMEMORY_POLICY=${REDIS_MAXMEMORY_POLICY:-allkeys-lru}'
+    ports:
+      - ":6379"
+    expose:
+      - "6379"
+    volumes:
+      - 'flowise-redis-cache-data:/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'redis-cli -h localhost -p 6379 ping'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  qdrant:
+    image: 'qdrant/qdrant:latest'
+    environment:
+      - 'QDRANT__SERVICE__HTTP_PORT=${QDRANT_HTTP_PORT:-6333}'
+      - 'QDRANT__SERVICE__GRPC_PORT=${QDRANT_GRPC_PORT:-6334}'
+      - 'QDRANT__LOG_LEVEL=${QDRANT_LOG_LEVEL:-INFO}'
+    ports:
+      - ":6333"
+      - ":6334"
+    expose:
+      - "6333"
+      - "6334"
+    volumes:
+      - 'flowise-qdrant-data:/qdrant/storage'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "wget -qO- http://127.0.0.1:6333/health || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: always
